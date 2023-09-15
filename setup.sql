@@ -20,6 +20,8 @@ CREATE TABLE public.memories (
     CONSTRAINT memories_pkey PRIMARY KEY (id)
 ) tablespace pg_default;
 
+CREATE INDEX ON memories USING ivfflat (memory_embedding vector_cosine_ops) WITH (lists = 100);
+
 CREATE OR REPLACE FUNCTION recall_memories (
     query_embedding vector (1536),
     match_threshold float,
