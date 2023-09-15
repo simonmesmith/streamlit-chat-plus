@@ -1,19 +1,16 @@
-import os
 from functools import partial
 
 import openai
-from dotenv import load_dotenv
+import streamlit as st
 
-from llm_functions import functions
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+respond = partial(openai.ChatCompletion.create)
 
-SYSTEM_MESSAGE = "You are an AI chatbot with functions."
 
-respond = partial(
-    openai.ChatCompletion.create,
-    model="gpt-4",
-    functions=functions,
-    stream=True,
-)
+def embed(text: str) -> str:
+    """Embeds text using OpenAI's API."""
+    embedding = openai.Embedding.create(
+        input=[text], model="text-embedding-ada-002"
+    )
+    return embedding["data"][0]["embedding"]

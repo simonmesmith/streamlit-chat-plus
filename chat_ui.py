@@ -1,27 +1,9 @@
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
-from llm import SYSTEM_MESSAGE, respond
-from llm_functions import call_function
-
-
-def add_message(
-    role: str,
-    content: str | None,
-    function_call: dict = None,
-    name: str = None,
-) -> None:
-    """Adds message to session state. If no messages, adds system message."""
-    if "messages" not in st.session_state:
-        st.session_state.messages = [
-            {"role": "system", "content": SYSTEM_MESSAGE}
-        ]
-    msg = {"role": role, "content": content}
-    if function_call:
-        msg["function_call"] = function_call
-    if name:
-        msg["name"] = name
-    st.session_state.messages.append(msg)
+import chat_data
+from llm import respond
+from llm_functions import call_function, functions
 
 
 def show_function_message(
@@ -32,7 +14,7 @@ def show_function_message(
     """Shows a function message."""
     if not placeholder:
         with st.chat_message("function"):
-            with st.expander(name):
+            with st.expander(f"Calling function: {name}"):
                 placeholder = st.empty()
     placeholder.markdown(content)
     return placeholder
@@ -80,8 +62,8 @@ def show_message(
 
 def show_existing_messages() -> None:
     """Shows existing messages."""
-    for msg in st.session_state.get("messages", []):
-        if msg["role"] in ["user", "assistant"]:
+    for msg in st.session_state.chat.messages:
+        if msg["role"] in ["user", "assistant"] and msg["content"]:
             show_message(msg["role"], msg["content"])
         elif msg["role"] == "function":
             show_message(msg["role"], msg["content"], name=msg["name"])
@@ -118,9 +100,11 @@ def handle_complete_function_call(
     placeholder: DeltaGenerator,
 ) -> None:
     """Handles a function call."""
-    add_message("assistant", None, function_call)
+    chat_data.add_message("assistant", None, function_call)
     function_content = call_function(**function_call)
-    add_message("function", function_content, name=function_call["name"])
+    chat_data.add_message(
+        "function", function_content, name=function_call["name"]
+    )
     show_message(
         "function", function_content, placeholder, function_call["name"]
     )
@@ -132,7 +116,7 @@ def handle_complete_assistant_content(
     placeholder: DeltaGenerator,
 ) -> bool:
     """Handles completed assistant content."""
-    add_message("assistant", content)
+    chat_data.add_message("assistant", content)
     show_message("assistant", content, placeholder)
     return True
 
@@ -146,7 +130,14 @@ def run_response_loop():
         function_call = {"name": "", "arguments": ""}
         function_placeholder = None
 
-        for chunk in respond(messages=st.session_state.messages):
+        response = respond(
+            model="gpt-4",
+            functions=functions,
+            messages=st.session_state.chat.messages,
+            stream=True,
+        )
+
+        for chunk in response:
             choice = chunk["choices"][0]
             if "delta" in choice and "function_call" in choice.delta:
                 function_placeholder = stream_function_call(

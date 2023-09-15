@@ -1,15 +1,27 @@
 # Streamlit Chat Plus
 
-This is a simple implementation (for now, anyway) of Streamlit chat functionality using the OpenAI API, with the addition of:
+> **Note**: This is more of a proof-of-concept than a production-ready app. At this point, for example, I haven't added any testing. Use at your own risk! Also note that I haven't done QA on the instructions for installation below. If you run into any issues, please let me know.
 
-* Streaming text
-* Function calls
+This is an LLM-powered chat app that uses a [Streamlit](https://streamlit.io) UI. It builds upon the standard Streamlit chat experience with the following:
 
-To use it:
+* Streaming responses
+* Function calling
+* Chat history
+* Memory (using embeddings)
 
-* Clone or otherwise copy this repository
-* Install requirements with `pip install -r requirements.txt`
-* Copy `example.env`, add your OpenAI API key, and save the file as .env
-* Run the chat with `streamlit run app.py`
+# Installation
 
-Currently, this has only one simple demonstration function called `multiply`. You can create more functions by following that example in `llm_functions.py`.
+* Get an [OpenAI API key](https://help.openai.com/en/articles/4936850-where-do-i-find-my-secret-api-key)
+* Create a [Supabase](https://supabase.com/) account, project, and database
+* Run `setup.sql` on your Supabase database
+* Clone or download this repo
+* Change `.streamlit/secrets_example.toml` to `.streamlit/secrets.toml` and add values for your OpenAI API key and Supabase URL and key
+
+# Usage
+
+Once you complete the above, you can navigate to the directory of this README file and run this in terminal:
+
+```bash
+streamlit run streamlit_app.py
+```
+
