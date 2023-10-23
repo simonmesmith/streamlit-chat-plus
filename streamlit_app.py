@@ -15,8 +15,19 @@ with st.sidebar:
     if len(st.session_state.chat_history) > 0:
         st.title("Past Chats")
         for chat in st.session_state.chat_history:
-            if st.button(chat.name, key=chat.id, type="secondary"):
+            title_col, button_col = st.columns([3, 1])
+            if title_col.button(
+                chat.name, key=f"Load {chat.id}", type="secondary"
+            ):
                 st.session_state.chat = chat_data.get_chat(chat.id)
+            if button_col.button("🗑️", key=f"Delete {chat.id}"):
+                if chat_data.delete_chat(chat.id):
+                    st.session_state.chat_history = (
+                        chat_data.get_chat_history()
+                    )
+                    st.rerun()
+                else:
+                    st.error("Error deleting chat.")
 
 chat_ui.show_existing_messages()
 

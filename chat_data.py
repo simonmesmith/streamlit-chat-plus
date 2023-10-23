@@ -117,3 +117,14 @@ def add_message(
         st.experimental_rerun()
     elif st.session_state.chat.id:  # If chat already inserted, update DB
         st.session_state.chat = update_chat(st.session_state.chat)
+
+
+def delete_chat(chat_id: int) -> bool:
+    """Deletes a chat from the DB."""
+    results = db_client().table("chats").delete().eq("id", chat_id).execute()
+    deleted_data = results.data
+
+    if deleted_data:
+        return deleted_data[0]["id"] == chat_id
+    else:
+        return False
