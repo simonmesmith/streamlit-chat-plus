@@ -114,7 +114,7 @@ def add_message(
         )
         st.session_state.chat = insert_chat(st.session_state.chat)
         st.session_state.chat_history.insert(0, st.session_state.chat)
-        st.experimental_rerun()
+        st.rerun()
     elif st.session_state.chat.id:  # If chat already inserted, update DB
         st.session_state.chat = update_chat(st.session_state.chat)
 
