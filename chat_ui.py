@@ -1,63 +1,13 @@
+"""Chat UI functions for the Streamlit interface."""
+
+from typing import Literal
+
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
 import chat_data
 from llm import respond
 from llm_functions import call_function, functions
-
-
-def show_function_message(
-    content: str | None = None,
-    placeholder: DeltaGenerator | None = None,
-    name: str | None = "function",
-) -> DeltaGenerator:
-    """Shows a function message."""
-    if not placeholder:
-        with st.chat_message("function"):
-            with st.expander(f"Calling function: {name}"):
-                placeholder = st.empty()
-    placeholder.markdown(content)
-    return placeholder
-
-
-def show_assistant_message(
-    content: str | None, placeholder: DeltaGenerator | None
-) -> DeltaGenerator:
-    """Shows an assistant message."""
-    if not placeholder:
-        with st.chat_message("assistant"):
-            placeholder = st.empty()
-    placeholder.markdown(content)
-    return placeholder
-
-
-def show_user_message(
-    content: str | None, placeholder: DeltaGenerator | None
-) -> DeltaGenerator:
-    """Shows a user message."""
-    if not placeholder:
-        with st.chat_message("user"):
-            placeholder = st.empty()
-    placeholder.markdown(content)
-    return placeholder
-
-
-def show_message(
-    role: str,
-    content: str,
-    placeholder: DeltaGenerator | None = None,
-    name: str | None = None,
-) -> None:
-    """Shows a message."""
-    if role == "function":
-        placeholder = show_function_message(content, placeholder, name)
-    elif role == "assistant":
-        placeholder = show_assistant_message(content, placeholder)
-    elif role == "user":
-        placeholder = show_user_message(content, placeholder)
-    else:
-        raise ValueError(f"Invalid role: {role}")
-    return placeholder
 
 
 def show_existing_messages() -> None:
@@ -69,56 +19,70 @@ def show_existing_messages() -> None:
             show_message(msg["role"], msg["content"], name=msg["name"])
 
 
-def stream_function_call(
-    function_call: dict,
-    function_call_delta: dict,
-    placeholder: DeltaGenerator | None,
+def show_message(
+    role: str,
+    content: str,
+    content_placeholder: DeltaGenerator | None = None,
+    name: str | None = None,
+    state: Literal["running", "complete", "error"] = "complete",
 ) -> None:
-    """Builds function call from stream. Returns placeholder."""
-    function_call["name"] += function_call_delta.get("name", "")
-    function_call["arguments"] += function_call_delta.get("arguments", "")
-    if len(function_call["arguments"]) > 0:
-        placeholder = show_message(
-            "function", None, placeholder, function_call["name"]
+    """Shows a message."""
+    if role == "function":
+        content_placeholder = show_function_message(
+            content, content_placeholder, name, state
         )
-    return placeholder
+    elif role == "assistant":
+        content_placeholder = show_assistant_message(
+            content, content_placeholder
+        )
+    elif role == "user":
+        content_placeholder = show_user_message(content, content_placeholder)
+    else:
+        raise ValueError(f"Invalid role: {role}")
+    return content_placeholder
 
 
-def stream_assistant_content(
-    content: str,
-    content_delta: str,
-    placeholder: DeltaGenerator | None,
-) -> tuple[DeltaGenerator, str]:
-    """Streams content to placeholder. Returns content and placeholder."""
-    content += content_delta
-    placeholder = show_message("assistant", content, placeholder)
-    return content, placeholder
+def show_function_message(
+    content: str | None = None,
+    content_placeholder: DeltaGenerator | None = None,
+    name: str | None = "function",
+    state: Literal["running", "complete", "error"] = "complete",
+) -> DeltaGenerator:
+    """Shows a function message."""
+
+    if not content_placeholder:
+        content_placeholder = st.status(label=name, state=state)
+    if state == "complete":
+        content_placeholder.update(state=state)
+        with content_placeholder:
+            # Streamlit markdown ignores \n. Mainly an issue with function
+            # content containing \n. So just adding this here right now:
+            content = content.replace("\n", "<br/>") if content else None
+            st.markdown(content, unsafe_allow_html=True)
+
+    return content_placeholder
 
 
-def handle_complete_function_call(
-    function_call: dict,
-    placeholder: DeltaGenerator,
-) -> None:
-    """Handles a function call."""
-    chat_data.add_message("assistant", None, function_call)
-    function_content = call_function(**function_call)
-    chat_data.add_message(
-        "function", function_content, name=function_call["name"]
-    )
-    show_message(
-        "function", function_content, placeholder, function_call["name"]
-    )
-    return None
+def show_assistant_message(
+    content: str | None, content_placeholder: DeltaGenerator | None
+) -> DeltaGenerator:
+    """Shows an assistant message."""
+    if not content_placeholder:
+        with st.chat_message("assistant"):
+            content_placeholder = st.empty()
+    content_placeholder.markdown(content)
+    return content_placeholder
 
 
-def handle_complete_assistant_content(
-    content: str,
-    placeholder: DeltaGenerator,
-) -> bool:
-    """Handles completed assistant content."""
-    chat_data.add_message("assistant", content)
-    show_message("assistant", content, placeholder)
-    return True
+def show_user_message(
+    content: str | None, content_placeholder: DeltaGenerator | None
+) -> DeltaGenerator:
+    """Shows a user message."""
+    if not content_placeholder:
+        with st.chat_message("user"):
+            content_placeholder = st.empty()
+    content_placeholder.markdown(content)
+    return content_placeholder
 
 
 def run_response_loop():
@@ -126,9 +90,9 @@ def run_response_loop():
     assistant_responded = False
     while not assistant_responded:
         assistant_content = ""
-        assistant_placeholder = None
+        assistant_content_placeholder = None
         function_call = {"name": "", "arguments": ""}
-        function_placeholder = None
+        function_content_placeholder = None
 
         response = respond(
             model="gpt-4",
@@ -140,30 +104,92 @@ def run_response_loop():
         for chunk in response:
             choice = chunk["choices"][0]
             if "delta" in choice and "function_call" in choice.delta:
-                function_placeholder = stream_function_call(
+                function_content_placeholder = stream_function_call(
                     function_call,
                     choice.delta.get("function_call", {}),
-                    function_placeholder,
+                    function_content_placeholder,
                 )
             elif "delta" in choice and "content" in choice.delta:
                 (
                     assistant_content,
-                    assistant_placeholder,
+                    assistant_content_placeholder,
                 ) = stream_assistant_content(
                     assistant_content,
                     choice.delta.get("content", ""),
-                    assistant_placeholder,
+                    assistant_content_placeholder,
                 )
 
             if choice["finish_reason"] == "function_call":
-                function_placeholder = handle_complete_function_call(
+                function_content_placeholder = handle_complete_function_call(
                     function_call,
-                    function_placeholder,
+                    function_content_placeholder,
                 )  # Resets function_placeholder to None
                 break
             elif choice["finish_reason"] == "stop":
                 assistant_responded = handle_complete_assistant_content(
                     assistant_content,
-                    assistant_placeholder,
+                    assistant_content_placeholder,
                 )  # Sets assistant_responded to True to exit while loop
                 break
+
+
+def stream_function_call(
+    function_call: dict,
+    function_call_delta: dict,
+    content_placeholder: DeltaGenerator | None,
+) -> None:
+    """Builds function call from stream. Returns placeholder."""
+    function_call["name"] += function_call_delta.get("name", "")
+    function_call["arguments"] += function_call_delta.get("arguments", "")
+    if len(function_call["arguments"]) > 0:
+        content_placeholder = show_message(
+            "function",
+            None,
+            content_placeholder,
+            function_call["name"],
+            "running",
+        )
+    return content_placeholder
+
+
+def stream_assistant_content(
+    content: str,
+    content_delta: str,
+    content_placeholder: DeltaGenerator | None,
+) -> tuple[DeltaGenerator, str]:
+    """Streams content to placeholder. Returns content and placeholder."""
+    content += content_delta
+    content_placeholder = show_message(
+        "assistant", content, content_placeholder
+    )
+    return content, content_placeholder
+
+
+def handle_complete_function_call(
+    function_call: dict,
+    content_placeholder: DeltaGenerator,
+) -> None:
+    """Handles a function call."""
+    chat_data.add_message("assistant", None, function_call)
+    function_content = call_function(**function_call)
+    chat_data.add_message(
+        "function", function_content, name=function_call["name"]
+    )
+    show_message(
+        "function",
+        function_content,
+        content_placeholder,
+        function_call["name"],
+        "complete",
+    )
+    return None
+
+
+def handle_complete_assistant_content(
+    content: str,
+    content_placeholder: DeltaGenerator,
+) -> bool:
+    """Handles completed assistant content."""
+    chat_data.add_message("assistant", content)
+    show_message("assistant", content, content_placeholder)
+    return True
