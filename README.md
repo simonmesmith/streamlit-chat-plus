@@ -8,6 +8,7 @@ This is an LLM-powered chat app that uses a [Streamlit](https://streamlit.io) UI
 * Function calling
 * Chat history
 * Memory (using embeddings)
+* Chat sharing (warning: any user with access to your app can enter a URL at <url>.com?shared_chat_id=<chat_id> to see a chat; chats are public by default)
 
 # Installation
 
